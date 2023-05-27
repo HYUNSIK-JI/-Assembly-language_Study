@@ -1,0 +1,182 @@
+어셈블리어 공부 하기
+
+a = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+b = [11, 12, 13, 14, 15]
+
+def one():
+    return a + b
+def two():
+    return a.extend(b)
+ 
+
+두개의 리스트가 존재 하고 두개 의 함수가 존재 한다고 했을때
+
+어셈블리어는 아래와 같이 존재 한다.
+
+ 
+
+section .data
+    a db 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+    a_len equ 10
+    b db 11, 12, 13, 14, 15
+    b_len equ 5
+
+section .text
+    global _start
+
+_start:
+    ; Call one()
+    call one
+    
+    ; Print the result of one()
+    mov ecx, eax
+    mov edx, a_len + b_len
+    call print_array
+    
+    ; Call two()
+    call two
+    
+    ; Print the result of two()
+    mov ecx, a
+    mov edx, a_len + b_len
+    call print_array
+
+    ; Exit the program
+    mov eax, 1
+    xor ebx, ebx
+    int 0x80
+
+; Concatenates arrays a and b and returns the resulting array
+one:
+    push ebp
+    mov ebp, esp
+
+    ; Calculate the length of the resulting array
+    mov ecx, a_len
+    add ecx, b_len
+
+    ; Allocate memory for the resulting array
+    mov eax, 4
+    mov ebx, 1
+    mov edx, ecx
+    int 0x80
+    mov esi, eax ; Store the address of the resulting array
+
+    ; Copy array a to the resulting array
+    mov ecx, a_len
+    mov edi, esi
+    rep movsb
+
+    ; Copy array b to the resulting array
+    mov ecx, b_len
+    add edi, ecx
+    mov esi, b
+    rep movsb
+
+    mov eax, esi ; Return the address of the resulting array
+
+    mov esp, ebp
+    pop ebp
+    ret
+
+; Extends array a with the elements of array b
+two:
+    mov ecx, b_len
+    mov edi, a + a_len
+    mov esi, b
+    rep movsb
+
+    ret
+
+; Prints an array of integers
+; ecx - pointer to the array
+; edx - length of the array
+print_array:
+    pusha
+
+    ; Loop through the array and print each element
+    mov eax, 4
+    mov ebx, 1
+    mov esi, ecx
+    mov ecx, edx
+    mov edx, 1
+    add edx, '0'
+    sub ecx, 1
+    add ecx, '0'
+
+print_loop:
+    mov al, byte [esi]
+    cmp al, ecx
+    jne print_element
+    mov al, 10 ; Print a newline character after the last element
+    call print_character
+    jmp print_end
+
+print_element:
+    call print_character
+
+    inc esi
+    dec edx
+
+    cmp edx, 0
+    jne print_loop
+
+print_end:
+    popa
+    ret
+
+; Prints a single character
+; al - character to print
+print_character:
+    pusha
+
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, esp
+    mov edx, 1
+    int 0x80
+
+    popa
+    ret
+
+
+무엇을 보고 메모리를 판단 해야 될까??
+; Calculate the length of the resulting array
+mov ecx, a_len
+add ecx, b_len
+
+; Allocate memory for the resulting array
+mov eax, 4
+mov ebx, 1
+mov edx, ecx
+int 0x80
+mov esi, eax ; Store the address of the resulting array
+
+이 부분 이다.
+
+아래는 메모리 계산하는 방법이다.
+
+
+a_len과 b_len 변수를 더하여 새로운 배열의 길이(ecx)를 계산한다.
+int 0x80 시스템 호출을 사용하여 메모리를 할당한다. 이때 메모리 할당은 edx 레지스터에 새로운 배열의 길이가 전달된다.
+메모리 할당이 완료되면 할당된 주소가 eax 레지스터에 저장 됩니다.
+따라서 one() 함수에서 할당되는 메모리의 크기는 eax 레지스터에 저장된 주소의 범위에 해당 해야한다.
+
+반면에 two() 함수는 배열 a를 확장하기 위해 메모리를 추가로 할당하지 않는다. 대신, 이미 할당된 a 배열의 뒤에 b 배열의 요소들을 복사합니다. 따라서 two() 함수는 이미 할당된 배열 a의 크기에 따라 메모리 사용량이 결정된다.
+ 
+
+one() 함수에서 새로운 배열의 길이(ecx)는 a_len과 b_len의 합이다. 
+
+따라서 a_len이 10이고 b_len이 5라고 가정하면, ecx는 15이다.
+
+메모리 할당은 int 0x80 시스템 호출을 통해 이루어진다. 
+
+메모리 할당의 크기는 edx 레지스터에 전달되는데, 이 값은 새로운 배열의 길이이다. 여기서 edx는 15!!.
+
+따라서 대략적으로 one() 함수가 약 15바이트의 메모리를 할당하는 것으로 예상 할 수 있다.
+
+two() 함수는 이미 할당된 a 배열을 확장하기 때문에 별도의 메모리 할당이 발생하지 않는다. 
+
+따라서 two() 함수는 a 배열의 크기에 따라 메모리 사용량이 결정된다, 
+
+즉 one() 함수가 two() 함수 보다 메모리를 더 많이 할당 한다.
